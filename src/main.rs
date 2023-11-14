@@ -3,7 +3,7 @@ use resolvo::{
     Candidates, DefaultSolvableDisplay, Dependencies, DependencyProvider, NameId, Pool, SolvableId,
     SolverCache, VersionSet,
 };
-use rpmrepo_metadata::{Package, RepositoryReader, Requirement};
+use rpmrepo_metadata::{RepositoryReader, Requirement};
 use std::{
     collections::{BTreeSet, HashMap},
     fmt::Display,
@@ -18,7 +18,7 @@ struct RPMPackageVersion {
     version: String,
     epoch: i32,
     requires: Vec<Requirement>,
-    provides: Vec<Requirement>,
+    // provides: Vec<Requirement>,
 }
 
 #[derive(Debug, Clone)]
@@ -83,7 +83,11 @@ impl Ord for RPMPackageVersion {
 
 impl Display for RPMPackageVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}-{}", self.package, self.epoch, self.version)
+        write!(f, "{}", self.version)?;
+        if self.epoch != 0 {
+            write!(f, " ({})", self.epoch)?;
+        }
+        Ok(())
     }
 }
 
@@ -127,9 +131,9 @@ struct RPMProvider {
 
 impl RPMProvider {
     pub fn from_repodata(path: &Path) -> Self {
-        let reader = RepositoryReader::new_from_directory(&path).unwrap();
+        let reader = RepositoryReader::new_from_directory(path).unwrap();
 
-        let mut pool = Pool::default();
+        let pool = Pool::default();
         let mut provides_to_package = HashMap::new();
 
         for pkg in reader.iter_packages().unwrap() {
@@ -137,13 +141,12 @@ impl RPMProvider {
             let name = pkg.name().to_string();
             let version = pkg.version().to_string();
             let epoch = pkg.epoch();
-            let provides = pkg.provides().clone();
-            let requires = pkg.requires().clone();
+            let provides = pkg.provides();
+            let requires = pkg.requires();
             let pack = RPMPackageVersion {
                 package: name.clone(),
                 version: version.clone(),
                 epoch,
-                provides: provides.to_vec(),
                 requires: requires.to_vec(),
             };
 
@@ -194,13 +197,13 @@ impl DependencyProvider<RPMRequirement> for RPMProvider {
 
     fn get_candidates(&self, name: NameId) -> Option<Candidates> {
         let package_name = self.pool.resolve_package_name(name);
-        println!("get_candidates for {}", package_name);
-        let package = self.provides_to_package.get(package_name)?;
-        let kandidaten = self.provides_to_package.get(package_name).unwrap().clone();
-        println!("kandidaten: {:?}", kandidaten);
-        println!("K: {}", kandidaten[0].display(&self.pool));
+        let _package = self.provides_to_package.get(package_name)?;
+        let candidates = match self.provides_to_package.get(package_name) {
+            Some(candidates) => candidates.clone(),
+            None => Vec::default(),
+        };
         let mut candidates = Candidates {
-            candidates: self.provides_to_package.get(package_name).unwrap().clone(),
+            candidates,
             ..Candidates::default()
         };
 
@@ -230,7 +233,7 @@ impl DependencyProvider<RPMRequirement> for RPMProvider {
 
     fn get_dependencies(&self, solvable: SolvableId) -> Dependencies {
         let candidate = self.pool.resolve_solvable(solvable);
-        let package_name = self.pool.resolve_package_name(candidate.name_id());
+        let _package_name = self.pool.resolve_package_name(candidate.name_id());
         let pack = candidate.inner();
 
         let requirements = &pack.requires;
@@ -238,7 +241,7 @@ impl DependencyProvider<RPMRequirement> for RPMProvider {
         let mut result = Dependencies::default();
 
         for req in requirements {
-            if req.name.starts_with("/") || req.name.contains(" if ") {
+            if req.name.starts_with('/') || req.name.contains(" if ") {
                 continue;
             };
             let dep_name = self.pool.intern_package_name(&req.name);
@@ -261,7 +264,7 @@ fn fetch_repodata(base_url: Url, target_folder: &Path) {
         return;
     }
 
-    let url = base_url.clone().join("repodata/repomd.xml").unwrap();
+    let url = base_url.join("repodata/repomd.xml").unwrap();
     let mut resp = client.get(url).send().unwrap();
 
     let path = target_folder.to_path_buf();
@@ -269,12 +272,11 @@ fn fetch_repodata(base_url: Url, target_folder: &Path) {
     let mut file = std::fs::File::create(path.join("repodata/repomd.xml")).unwrap();
     std::io::copy(&mut resp, &mut file).unwrap();
 
-    let reader = RepositoryReader::new_from_directory(&target_folder).unwrap();
+    let reader = RepositoryReader::new_from_directory(target_folder).unwrap();
     let repomd = reader.repomd();
     // download the other files
     let data = repomd.get_filelist_data();
     let url = base_url
-        .clone()
         .join(&data.location_href.to_string_lossy())
         .unwrap();
     let mut resp = client.get(url).send().unwrap();
@@ -283,7 +285,6 @@ fn fetch_repodata(base_url: Url, target_folder: &Path) {
 
     let data = repomd.get_other_data();
     let url = base_url
-        .clone()
         .join(&data.location_href.to_string_lossy())
         .unwrap();
     let mut resp = client.get(url).send().unwrap();
@@ -292,7 +293,6 @@ fn fetch_repodata(base_url: Url, target_folder: &Path) {
 
     let data = repomd.get_primary_data();
     let url = base_url
-        .clone()
         .join(&data.location_href.to_string_lossy())
         .unwrap();
     let mut resp = client.get(url).send().unwrap();
@@ -300,8 +300,9 @@ fn fetch_repodata(base_url: Url, target_folder: &Path) {
     std::io::copy(&mut resp, &mut file).unwrap();
 }
 
+#[allow(dead_code)]
 fn print_pkgs(path: &Path) {
-    let reader = RepositoryReader::new_from_directory(&path).unwrap();
+    let reader = RepositoryReader::new_from_directory(path).unwrap();
 
     for pkg in reader.iter_packages().unwrap() {
         let pkg = pkg.unwrap();
@@ -337,7 +338,7 @@ fn main() {
     let provider = RPMProvider::from_repodata(&target_folder);
     println!("Provider created ...");
     let mut solver = resolvo::Solver::new(provider);
-    let name = "libsolv";
+    let name = "rust";
     let spec = RPMRequirement(Requirement {
         name: name.to_string(),
         flags: Some("GT".into()),
@@ -359,22 +360,18 @@ fn main() {
                 "Error: {}",
                 problem.display_user_friendly(&solver, &DefaultSolvableDisplay)
             );
-            return ();
+            return;
         }
     };
 
-    println!("Solution: {:?}", solvables);
     let resolved: BTreeSet<String> = solvables
         .iter()
-        .map(|s| s.display(&solver.pool()).to_string())
+        .map(|s| s.display(solver.pool()).to_string())
         .collect();
+
     println!("Resolved:\n");
 
     for r in resolved {
         println!("- {}", r);
     }
-    // for s in solvables {
-    //     let solvable = solver.pool().resolve_solvable(s);
-    //     println!("{}: {}", solvable.name_id().display(solver.pool()), solvable.inner());
-    // }
 }
