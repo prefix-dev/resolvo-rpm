@@ -18,7 +18,7 @@ struct RPMPackageVersion {
     version: String,
     epoch: i32,
     requires: Vec<Requirement>,
-    provides: Requirement,
+    provides: Vec<Requirement>,
 }
 
 #[derive(Debug, Clone)]
@@ -83,11 +83,7 @@ impl Ord for RPMPackageVersion {
 
 impl Display for RPMPackageVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}: {}-{}-{}",
-            self.package, self.provides.name, self.epoch, self.version
-        )
+        write!(f, "{}: {}-{}", self.package, self.epoch, self.version)
     }
 }
 
@@ -143,19 +139,19 @@ impl RPMProvider {
             let epoch = pkg.epoch();
             let provides = pkg.provides().clone();
             let requires = pkg.requires().clone();
+            let pack = RPMPackageVersion {
+                package: name.clone(),
+                version: version.clone(),
+                epoch,
+                provides: provides.to_vec(),
+                requires: requires.to_vec(),
+            };
+
+            let name_id = pool.intern_package_name(&name);
+            let solvable = pool.intern_solvable(name_id, pack.clone());
 
             for p in provides {
                 println!("{} provides {}", name, p.name);
-                let pack = RPMPackageVersion {
-                    package: name.clone(),
-                    version: version.clone(),
-                    epoch,
-                    provides: p.clone(),
-                    requires: requires.to_vec(),
-                };
-
-                let name_id = pool.intern_package_name(&name);
-                let solvable = pool.intern_solvable(name_id, pack.clone());
 
                 let provides = provides_to_package
                     .entry(p.name.clone())
@@ -184,6 +180,10 @@ impl DependencyProvider<RPMRequirement> for RPMProvider {
         solvables.sort_by(|a, b| {
             let a = self.pool.resolve_solvable(*a).inner();
             let b = self.pool.resolve_solvable(*b).inner();
+
+            if a.epoch != b.epoch {
+                return a.epoch.cmp(&b.epoch);
+            }
 
             version_compare::compare(&a.version, &b.version)
                 .unwrap()
