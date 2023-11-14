@@ -936,6 +936,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "resolvo-rpm"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "reqwest",
+ "resolvo",
+ "rpmrepo_metadata",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "version-compare",
+]
+
+[[package]]
 name = "rpmrepo_metadata"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -950,20 +964,6 @@ dependencies = [
  "sha1",
  "sha2",
  "thiserror",
-]
-
-[[package]]
-name = "rrpm"
-version = "0.1.0"
-dependencies = [
- "clap",
- "reqwest",
- "resolvo",
- "rpmrepo_metadata",
- "tracing",
- "tracing-subscriber",
- "url",
- "version-compare",
 ]
 
 [[package]]
