@@ -1,8 +1,9 @@
 use resolvo::{
-    Candidates, Condition, ConditionId, ConditionalRequirement, Dependencies, DependencyProvider,
-    HintDependenciesAvailable, Interner, KnownDependencies, NameId, Requirement as ResolvoRequirement,
-    SolvableId, SolverCache, StringId, VersionSetId, VersionSetUnionId,
     utils::{Pool, VersionSet},
+    Candidates, Condition, ConditionId, ConditionalRequirement, Dependencies, DependencyProvider,
+    HintDependenciesAvailable, Interner, KnownDependencies, NameId,
+    Requirement as ResolvoRequirement, SolvableId, SolverCache, StringId, VersionSetId,
+    VersionSetUnionId,
 };
 use rpmrepo_metadata::{RepositoryReader, Requirement};
 use std::{collections::HashMap, fmt::Display, hash::Hash, path::Path};
@@ -231,11 +232,7 @@ impl DependencyProvider for RPMProvider {
             .collect()
     }
 
-    async fn sort_candidates(
-        &self,
-        _solver: &SolverCache<Self>,
-        solvables: &mut [SolvableId],
-    ) {
+    async fn sort_candidates(&self, _solver: &SolverCache<Self>, solvables: &mut [SolvableId]) {
         solvables.sort_by(|a, b| {
             let a = &self.pool.resolve_solvable(*a).record;
             let b = &self.pool.resolve_solvable(*b).record;
