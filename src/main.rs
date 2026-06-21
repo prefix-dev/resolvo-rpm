@@ -802,10 +802,42 @@ fn print_solvable_table(provider: &RpmProvider, solvables: &[SolvableId]) -> usi
 }
 
 /// Print the resolved packages in alphabetical order, aligned in columns,
-/// with repo labels and a total count on stderr.
+/// with repo labels and a total count on stderr. Virtual solvables
+/// (advisories, groups) are listed separately from real packages.
 fn print_resolution(solver: &resolvo::Solver<RpmProvider>, solvables: &[resolvo::SolvableId]) {
-    let count = print_solvable_table(solver.provider(), solvables);
-    eprintln!("\n{} packages resolved", count);
+    let provider = solver.provider();
+
+    let mut packages = Vec::new();
+    let mut advisories = Vec::new();
+    let mut groups = Vec::new();
+
+    for &sid in solvables {
+        let name = provider.package_name(sid);
+        if name.starts_with("patch:") {
+            advisories.push(sid);
+        } else if name.starts_with('@') {
+            groups.push(sid);
+        } else {
+            packages.push(sid);
+        }
+    }
+
+    let pkg_count = print_solvable_table(provider, &packages);
+
+    if !advisories.is_empty() {
+        let labels: Vec<&str> = advisories
+            .iter()
+            .map(|&s| provider.package_name(s).strip_prefix("patch:").unwrap())
+            .collect();
+        eprintln!("\nAdvisories: {}", labels.join(", "));
+    }
+
+    if !groups.is_empty() {
+        let labels: Vec<&str> = groups.iter().map(|&s| provider.package_name(s)).collect();
+        eprintln!("\nGroups: {}", labels.join(", "));
+    }
+
+    eprintln!("\n{} packages resolved", pkg_count);
 }
 
 /// Return the maximum value in an iterator, for column-width calculation.

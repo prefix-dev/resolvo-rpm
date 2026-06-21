@@ -1084,6 +1084,12 @@ impl RpmProvider {
         let virtual_name = format!("patch:{}", advisory.id);
         let name_id = self.pool.intern_package_name(&virtual_name);
 
+        // TODO: optional mode to force-install advisory packages (requires),
+        // not just constrain their versions. Useful for "install everything
+        // this advisory touches" vs the default "constrain already-selected
+        // packages".
+        // let mut requires: Vec<VersionSetId> = Vec::new();
+        // let mut seen_names: std::collections::HashSet<&str> = std::collections::HashSet::new();
         let mut conflicts: Vec<VersionSetId> = Vec::new();
 
         for collection in &advisory.pkglist {
@@ -1116,6 +1122,11 @@ impl RpmProvider {
                     preinstall: false,
                 };
                 conflicts.push(self.pool.intern_version_set(pkg_name_id, req));
+                // // Require each referenced package (deduplicated by name,
+                // // since multi-arch advisories list the same name for each arch).
+                // if seen_names.insert(&pkg.name) {
+                //     requires.push(intern_any_version(&self.pool, &pkg.name));
+                // }
             }
         }
 
@@ -1127,6 +1138,7 @@ impl RpmProvider {
 
         let mut pack = RpmPackageVersion::virtual_package(virtual_name, repo_id);
         pack.version = advisory_version.to_owned();
+        // pack.requires = requires;
         pack.conflicts = conflicts;
 
         let solvable = self.register_solvable(name_id, pack);
