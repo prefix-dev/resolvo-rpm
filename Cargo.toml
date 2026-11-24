@@ -1,17 +1,36 @@
 [package]
 name = "resolvo-rpm"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "BSD-3-Clause"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = [
+    "Wolf Vollprecht <w.vollprecht@gmail.com>",
+    "Daniel Alley <dalley@redhat.com",
+]
+readme = "README.md"
 
 [dependencies]
-clap = { version = "4.6", features = ["derive"] }
-reqwest = { version = "0.13", features = ["blocking"] }
-resolvo = "0.10"
-rpmrepo_metadata = "0.3"
-tracing = "0.1"
-tracing-subscriber = "0.3"
-url = "2.5"
-version-compare = "0.2"
+ahash = "0.8.12"
+clap = { version = "4.6.1", features = ["derive"] }
+reqwest = { version = "0.13.4", features = ["blocking"] }
+resolvo = { version = "0.10.3" }
+rpm-version = "0.5"
+rpmrepo_metadata = "0.5.3"
+thiserror = "2"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+url = "2.5.8"
+
+[dev-dependencies]
+criterion = { version = "0.8", features = ["html_reports"] }
+
+[[bench]]
+name = "resolve"
+harness = false
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+debug = 1
+lto = "thin"
